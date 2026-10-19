@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "semgrep-odoo"
+version = "0.0.0"
+description = "Semgrep rules for Odoo modules, applied by the Odoo series each module targets."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["semgrep>=1.100", "packaging>=23", "PyYAML>=6", "tomli>=2; python_version < '3.11'"]
+
+[dependency-groups]
+dev = ["prek>=0.3", "pytest>=8", "ruff>=0.14", "zizmor>=1.16"]
+
+[project.scripts]
+semgrep-odoo = "semgrep_odoo.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+semgrep_odoo = ["rules/**/*.yaml"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+# Deliberately bad Odoo code, kept as the patterns must match it.
+extend-exclude = ["tests/rules"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "PIE", "RET", "SIM", "RUF"]

@@ -1,0 +1,102 @@
+default_language_version:
+    python: python3.12
+
+repos:
+
+  # ----------------------------------------------------------------------------
+  # All files
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: all      | fix trailing whitespaces
+      - id: end-of-file-fixer
+        name: all      | fix end of files
+      - id: check-yaml
+        name: all      | check yaml
+      - id: check-toml
+        name: all      | check toml
+      - id: check-merge-conflict
+        name: all      | check merge conflict markers
+      - id: check-added-large-files
+        name: all      | check large files
+        args: ['--maxkb=500']
+
+  # CHANGELOG.md is release-please's output, so a fix applied there is undone by the next release.
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.23.2
+    hooks:
+      - id: markdownlint-cli2
+        name: all      | markdown format (markdownlint)
+        args: ['--fix']
+        exclude: ^CHANGELOG\.md$
+        language_version: '22'
+        additional_dependencies: ['markdownlint-cli2@0.23.2']
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        name: all      | secrets (gitleaks)
+
+  # ----------------------------------------------------------------------------
+  # GitHub Actions
+
+  - repo: local
+    hooks:
+      - id: zizmor
+        name: actions  | workflow security (zizmor)
+        entry: uv run zizmor --no-progress --config .github/zizmor.yml
+          .github/workflows .github/dependabot.yml
+        pass_filenames: false
+        language: system
+        types: [yaml]
+        files: ^\.github/(workflows/.*|dependabot\.ya?ml|zizmor\.ya?ml)$
+        require_serial: true
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+        name: actions  | workflow lint (actionlint)
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.38.2
+    hooks:
+      - id: check-github-workflows
+        name: actions  | workflow schema
+      # A job without a timeout holds its runner until GitHub's own six-hour ceiling.
+      - id: check-github-workflows-require-timeout
+        name: actions  | workflow timeouts
+      - id: check-dependabot
+        name: actions  | dependabot schema
+
+  # ----------------------------------------------------------------------------
+  # Python
+  #
+  # Every hook here runs the tool from the project's own environment, so the version is the one
+  # uv.lock pins and `make check` uses.
+
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: python   | format (ruff)
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: ruff
+        name: python   | lint (ruff)
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: uv-lock
+        name: python   | lockfile is current (uv)
+        entry: uv lock --check
+        language: system
+        files: (^|/)pyproject\.toml$|^uv\.lock$
+        pass_filenames: false

@@ -1,0 +1,26 @@
+rules:
+  - id: odoo-view-attrs-states-removed
+    languages: [xml]
+    severity: ERROR
+    message: attrs and states were removed from views in 17.0; use invisible, readonly and required expressions.
+    metadata:
+      odoo-version: ">=17.0"
+      category: deprecation
+    pattern-either:
+      - pattern: <$TAG attrs="$VALUE">
+      - pattern: <$TAG states="$VALUE">
+
+  - id: odoo-view-tree-renamed
+    languages: [xml]
+    severity: WARNING
+    message: The tree view type is named list since 18.0.
+    metadata:
+      odoo-version: ">=18.0"
+      category: deprecation
+    pattern-either:
+      - pattern: <tree>...</tree>
+      - patterns:
+          - pattern: <field name="view_mode">$MODES</field>
+          - metavariable-regex:
+              metavariable: $MODES
+              regex: (^|,)\s*tree\s*(,|$)

@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+# Nothing by default; the job below names what it holds and why.
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # The release is the tag: prek and pre-commit install the hook from the repository at the `rev`
+  # a consumer pins, so nothing is published anywhere else.
+  release-please:
+    name: Release PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The job's own token writes nothing: everything below goes through the release App's token.
+    permissions:
+      contents: read
+    steps:
+      # The release App rather than the job's own token: GitHub holds the workflows of a pull
+      # request that token opens until someone approves them, so the release pull request would
+      # never get its CI unattended.
+      - name: Generate the release App token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          # Named rather than left blank, because blank means every permission the installation
+          # holds. A permission it does not hold fails the token request itself.
+          permission-contents: write # the tag, the GitHub release, the lockfile commit
+          permission-pull-requests: write # opens and updates the release pull request
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      # Release Please rewrites the version in pyproject.toml and knows nothing of uv.lock, which
+      # records the same version. Left alone the release branch fails `uv sync --locked`, so the
+      # lockfile is brought back in step on the branch before anyone merges it.
+      - name: Checkout the release branch
+        if: ${{ steps.release.outputs.pr }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ steps.release.outputs.pr && fromJSON(steps.release.outputs.pr).headBranchName || '' }}
+          # The push below is the whole reason for this checkout, so the credential stays.
+          persist-credentials: true # zizmor: ignore[artipacked]
+
+      - name: Setup uv
+        if: ${{ steps.release.outputs.pr }}
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          # No cache in a workflow that holds the release App's key: a cache is writable by any
+          # job that can reach the same key.
+          enable-cache: false
+
+      - name: Sync the lockfile
+        if: ${{ steps.release.outputs.pr }}
+        run: |
+          uv lock
+          if git diff --quiet -- uv.lock; then
+            echo "uv.lock already matches the release version."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: sync uv.lock with the release version" -- uv.lock
+          git push

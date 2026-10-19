@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  pull_request:
+    # This list is load-bearing: naming any type replaces the implied set.
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
+
+# A superseded push to a pull request should not keep burning minutes, so its in-progress runs are
+# cancelled when a newer commit lands. A run on main is left to finish.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Read-only by default, so a job gets write access only by asking for it in its own block and
+# saying there what it needs it for. No job in this file does.
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    name: Pre-commit Hooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+
+      # The local hooks run the tools from the project environment, so it has to exist first.
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Run pre-commit
+        uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204 # v3.0.1
+        with:
+          extra-args: --all-files
+
+  tests:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12', '3.14']
+    env:
+      # Outranks .python-version, which pins the version for local work.
+      UV_PYTHON: ${{ matrix.python }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Run the rule fixtures and the tests
+        run: make test
+
+  # What a consumer gets: the hook installed by prek from this checkout, run on a module of each
+  # series. The fixture's own assertions are in the step, so a rule that stops gating by version
+  # fails here even when every unit test passes.
+  hook:
+    name: Hook
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+
+      - name: Run the hook on a 17.0 and an 18.0 module
+        run: |
+          uv tool install prek
+          consumer="$RUNNER_TEMP/consumer"
+          mkdir -p "$consumer"/m17/views "$consumer"/m18/views
+          for series in 17 18; do
+            echo "{'version': '${series}.0.1.0.0'}" > "$consumer/m${series}/__manifest__.py"
+            printf '<odoo><record id="v" model="ir.ui.view"><field name="arch" type="xml">\n<tree><field name="name"/></tree>\n</field></record></odoo>\n' \
+              > "$consumer/m${series}/views/view.xml"
+          done
+          git -C "$consumer" init -q
+          git -C "$consumer" add -A
+          cd "$consumer"
+          if prek try-repo "$GITHUB_WORKSPACE" --all-files > output.txt 2>&1; then
+            cat output.txt
+            echo "::error::the hook passed, but the 18.0 module holds a <tree> view"
+            exit 1
+          fi
+          cat output.txt
+          grep -q 'm18/views/view.xml' output.txt
+          if grep -q 'm17/views/view.xml' output.txt; then
+            echo "::error::the hook flagged <tree> in the 17.0 module"
+            exit 1
+          fi
+
+  # Single aggregation gate: passes if no job failed or was cancelled, and a skipped job counts as
+  # a pass, exactly as GitHub treats a skipped required check. This is the one required status
+  # check, so branch protection stays stable as jobs are added.
+  ci-gate:
+    name: CI Passed
+    needs:
+      - pre-commit
+      - tests
+      - hook
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Evaluate CI job results
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS_JSON"
+          jq -e 'all(.[]; .result == "success" or .result == "skipped")' <<<"$NEEDS_JSON" >/dev/null

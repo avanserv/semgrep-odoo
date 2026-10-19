@@ -1,0 +1,77 @@
+rules:
+  - id: odoo-api-multi-one-removed
+    languages: [python]
+    severity: ERROR
+    message: "@api.multi and @api.one were removed in 13.0; methods are multi-record by default."
+    metadata:
+      odoo-version: ">=13.0"
+      category: deprecation
+    pattern-either:
+      - pattern: |
+          @api.multi
+          def $METHOD(...): ...
+      - pattern: |
+          @api.one
+          def $METHOD(...): ...
+
+  - id: odoo-fields-view-get-removed
+    languages: [python]
+    severity: ERROR
+    message: fields_view_get() was replaced by get_views() and _get_view() in 16.0.
+    metadata:
+      odoo-version: ">=16.0"
+      category: deprecation
+    patterns:
+      - pattern-inside: |
+          class $MODEL(...):
+              ...
+      - pattern: |
+          def fields_view_get(...): ...
+
+  - id: odoo-name-get-deprecated
+    languages: [python]
+    severity: WARNING
+    message: name_get() is ignored since 17.0; override _compute_display_name() instead.
+    metadata:
+      odoo-version: ">=17.0"
+      category: deprecation
+    patterns:
+      - pattern-inside: |
+          class $MODEL(...):
+              ...
+      - pattern: |
+          def name_get(...): ...
+
+  - id: odoo-group-operator-renamed
+    languages: [python]
+    severity: WARNING
+    message: The group_operator field attribute is named aggregator since 18.0.
+    metadata:
+      odoo-version: ">=18.0"
+      category: deprecation
+    pattern: fields.$TYPE(..., group_operator=$OPERATOR, ...)
+
+  - id: odoo-sql-constraints-deprecated
+    languages: [python]
+    severity: WARNING
+    message: _sql_constraints is deprecated since 19.0; declare models.Constraint attributes instead.
+    metadata:
+      odoo-version: ">=19.0"
+      category: deprecation
+    patterns:
+      - pattern-inside: |
+          class $MODEL(...):
+              ...
+      - pattern: _sql_constraints = $CONSTRAINTS
+
+  - id: odoo-record-env-shortcuts-deprecated
+    languages: [python]
+    severity: WARNING
+    message: self._cr, self._uid and self._context are deprecated since 19.0; use self.env.cr, self.env.uid and self.env.context.
+    metadata:
+      odoo-version: ">=19.0"
+      category: deprecation
+    pattern-either:
+      - pattern: self._cr
+      - pattern: self._uid
+      - pattern: self._context

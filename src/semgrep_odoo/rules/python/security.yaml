@@ -1,0 +1,45 @@
+rules:
+  - id: odoo-sql-injection
+    languages: [python]
+    severity: ERROR
+    message: Query built by string formatting; pass parameters separately or use odoo.tools.SQL.
+    metadata:
+      category: security
+      cwe: "CWE-89: SQL injection"
+    pattern-either:
+      - pattern: $CR.execute(f"...", ...)
+      - pattern: $CR.execute("..." % $ARGS, ...)
+      - pattern: $CR.execute("..." + $ARG, ...)
+      - pattern: $CR.execute("...".format(...), ...)
+      - patterns:
+          - pattern-either:
+              - pattern-inside: |
+                  $QUERY = f"..."
+                  ...
+              - pattern-inside: |
+                  $QUERY = "..." % $ARGS
+                  ...
+              - pattern-inside: |
+                  $QUERY = "..." + $ARG
+                  ...
+              - pattern-inside: |
+                  $QUERY = "...".format(...)
+                  ...
+          - pattern: $CR.execute($QUERY, ...)
+
+  - id: odoo-sudo-in-public-route
+    languages: [python]
+    severity: WARNING
+    message: sudo() in a route reachable without login bypasses access rights; check every record it exposes.
+    metadata:
+      category: security
+      cwe: "CWE-285: Improper authorization"
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              @http.route(..., auth="public", ...)
+              def $HANDLER(...): ...
+          - pattern-inside: |
+              @http.route(..., auth="none", ...)
+              def $HANDLER(...): ...
+      - pattern: $RECORDS.sudo(...)

@@ -7,6 +7,7 @@ def make_module(root, version):
     module = root / "my_module"
     (module / "models").mkdir(parents=True)
     (module / "__manifest__.py").write_text(f"{{'name': 'My module', 'version': {version!r}}}")
+
     return module
 
 

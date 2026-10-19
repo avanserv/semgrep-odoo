@@ -19,6 +19,7 @@ def series_arg(value: str) -> str:
         Version(value)
     except InvalidVersion:
         raise argparse.ArgumentTypeError(f"not an Odoo series: {value!r}") from None
+
     return value
 
 
@@ -33,16 +34,20 @@ def list_rules(argv: list[str]) -> int:
     parser.add_argument("--odoo-version", type=series_arg)
     args = parser.parse_args(argv)
     rules = rules_for(args.odoo_version) if args.odoo_version else load_rules()
+
     for rule in rules:
         spec = rule.get("metadata", {}).get(VERSION_KEY, "any")
         print(f"{rule['id']:<45} {spec}")
+
     return 0
 
 
 def scan(series: str | None, files: list[str], semgrep_args: list[str]) -> int:
     rules = rules_for(series)
+
     if not rules:
         return 0
+
     # Semgrep prefixes rule ids with the config's directory relative to the working directory,
     # so only a config written there reports `odoo-sql-injection` instead of `tmp.odoo-...`.
     with tempfile.NamedTemporaryFile(
@@ -62,13 +67,16 @@ def scan(series: str | None, files: list[str], semgrep_args: list[str]) -> int:
             *semgrep_args,
             *files,
         ]
+
         return subprocess.run(command, check=False).returncode
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+
     if argv[:1] == ["list-rules"]:
         return list_rules(argv[1:])
+
     parser = argparse.ArgumentParser(prog="semgrep-odoo")
     parser.add_argument(
         "--odoo-version",
@@ -86,19 +94,26 @@ def main(argv: list[str] | None = None) -> int:
     default = args.odoo_version or pyproject_series(Path.cwd())
     groups: dict[str | None, list[str]] = defaultdict(list)
     unknown_modules = set()
+
     for name in args.files:
         module, series = detect_series(Path(name), default)
+
         if series is None:
             unknown_modules.add(module or Path(name).parent)
+
         groups[series].append(name)
+
     for module in sorted(unknown_modules):
         print(
             f"semgrep-odoo: no Odoo series for {module}, running unversioned rules only",
             file=sys.stderr,
         )
+
     status = 0
+
     for series, files in groups.items():
         status = max(status, scan(series, files, args.semgrep_args))
+
     return status
 
 

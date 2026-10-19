@@ -100,3 +100,9 @@ repos:
         language: system
         files: (^|/)pyproject\.toml$|^uv\.lock$
         pass_filenames: false
+
+  - repo: https://github.com/avanserv/spacify-pre-commit
+    rev: v0.2.0
+    hooks:
+      - id: spacify
+        name: python   | spacing (spacify)

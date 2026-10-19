@@ -40,6 +40,7 @@ class Partner(models.Model):
         self._cr.execute("SELECT 1")
         # ok: odoo-record-env-shortcuts-deprecated
         self.env.cr.execute("SELECT 1")
+
         # ruleid: odoo-record-env-shortcuts-deprecated
         return self._context.get("lang")
 

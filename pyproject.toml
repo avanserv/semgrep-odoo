@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "semgrep-odoo"
-version = "0.0.0"
+version = "0.1.0"
 description = "Semgrep rules for Odoo modules, applied by the Odoo series each module targets."
 readme = "README.md"
 license = "MIT"

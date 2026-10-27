@@ -1,5 +1,36 @@
 # semgrep-odoo
 
+**Archived: use [odooscan](https://github.com/avanserv/odooscan) instead.** It covers every rule
+here and also checks each module against an index of every module it builds on (unknown models,
+fields and XML ids, missing `depends`, access rules). Replace the hook with:
+
+```yaml
+repos:
+  - repo: https://github.com/avanserv/odooscan-pre-commit
+    rev: v0.2.0
+    hooks:
+      - id: odooscan
+```
+
+odooscan reads its series from the manifest the same way, and `odoo-version` under
+`[tool.odooscan]` replaces `[tool.semgrep-odoo]`. Rewrite `# nosemgrep: <id>` comments as
+`# odooscan: ignore[<code>]` with these codes:
+
+| semgrep-odoo | odooscan |
+| --- | --- |
+| `odoo-sql-injection` | `OD101` |
+| `odoo-sudo-in-public-route` | `OD111` |
+| `odoo-name-get-deprecated` | `OD106` |
+| `odoo-api-multi-one-removed` | `OD107` |
+| `odoo-group-operator-renamed` | `OD108` |
+| `odoo-record-env-shortcuts-deprecated` | `OD109` |
+| `odoo-sql-constraints-deprecated` | `OD110` |
+| `odoo-fields-view-get-removed` | `OD113` |
+| `odoo-view-attrs-states-removed` | `OD305` |
+| `odoo-view-tree-renamed` | `OD306` |
+
+The rest of this page documents v0.1.0, which keeps working but gets no further changes.
+
 Semgrep rules for Odoo modules, run as a [prek](https://github.com/j178/prek) or
 [pre-commit](https://pre-commit.com) hook. Each rule declares the Odoo series it applies to, and the
 hook checks every file only against the rules for the series of the module that holds it: a

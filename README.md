@@ -39,7 +39,7 @@ hook checks every file only against the rules for the series of the module that 
 ```yaml
 repos:
   - repo: https://github.com/avanserv/semgrep-odoo
-    rev: v0.1.0 # x-release-please-version
+    rev: v0.1.1 # x-release-please-version
     hooks:
       - id: semgrep-odoo
 ```
